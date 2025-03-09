@@ -1,85 +1,79 @@
-name: CI/CD Pipeline
+name: Node js Application Deployment  
 
-on:
-  push:
-    branches: [ main ]
-    paths-ignore:
-      - 'kubernetes/deployment.yaml'  # Ignore changes to this file to prevent loops
-  pull_request:
-    branches: [ main ]
+on: 
+    push:  [ main ]                   # when to trigger the pipeline 
+    paths-ignore: 
+       - 'kubernetes/deployment.yaml' #Ignore changes to this file to prevent loops
 
 jobs:
-  test:
-    name: Unit Testing
+  unit-test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4.2.2   # go to github marketplace then search with "git checkout" 
       
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v4.2.0  
         with:
-          node-version: '20'
-          cache: 'npm'
-      
+           node-version: '20'
+           cache: 'npm'
+
       - name: Install dependencies
         run: npm ci
-      
-      - name: Run tests
+
+      - name: Run Tests
         run: npm test || echo "No tests found, would add tests in a real project"
 
-  lint:
-    name: Static Code Analysis
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  static-code-Analysis:
+     runs-on: ubuntu-latest
+     steps:
+       - name: Checkout
+         uses: actions/checkout@v4.2.2   # go to github marketplace then search with "git checkout" 
       
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-      
-      - name: Install dependencies
-        run: npm ci
-      
-      - name: Run ESLint
-        run: npm run lint
+       - name: Setup Node.js environment
+         uses: actions/setup-node@v4.2.0  
+         with:
+           node-version: '20'
+           cache: 'npm'
 
-  build:
-    name: Build
+       - name: Install dependencies
+         run: npm ci
+
+       - name: Run ESLint
+         run: npm run lint
+
+  Build: 
     runs-on: ubuntu-latest
-    needs: [test, lint]
+    needs: [ unit-test, static-code-Analysis ]
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - name: checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Setup Node.js environment
+        uses: actions/setup-node@v4.2.0  
         with:
-          node-version: '20'
-          cache: 'npm'
-      
+           node-version: '20'
+           cache: 'npm'
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Build project
         run: npm run build
-      
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v4.6.1  
         with:
           name: build-artifacts
           path: dist/
+      
 
-  docker:
-    name: Docker Build and Push
+  Build-Docker-Image:
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [ Build ]
     env:
-      REGISTRY: ghcr.io
-      IMAGE_NAME: ${{ github.repository }}
+        REGISTRY: ghcr.io
+        IMAGE_NAME: ${{ github.repository }}
     outputs:
       image_tag: ${{ steps.set_output.outputs.image_tag }}
     steps:
@@ -91,16 +85,16 @@ jobs:
         with:
           name: build-artifacts
           path: dist/
-      
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker images
+        uses: docker/build-push-action@v6.15.0
       
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.TOKEN }}
+            registry: ${{ env.REGISTRY }}
+            username: ${{ github.actor }}
+            password: ${{ secrets.TOKEN }}
       
       - name: Extract metadata for Docker
         id: meta
@@ -111,7 +105,7 @@ jobs:
             type=sha,format=long
             type=ref,event=branch
             latest
-      
+
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
@@ -120,7 +114,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           load: true
-      
+       
+
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
@@ -131,6 +126,7 @@ jobs:
           vuln-type: 'os,library'
           severity: 'CRITICAL,HIGH'
       
+
       - name: Push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -146,7 +142,7 @@ jobs:
   update-k8s:
     name: Update Kubernetes Deployment
     runs-on: ubuntu-latest
-    needs: [docker]
+    needs: [ Build-Docker-Image ]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - name: Checkout code
@@ -167,7 +163,7 @@ jobs:
         run: |
           # Define the new image with tag
           NEW_IMAGE="${REGISTRY}/${GITHUB_REPOSITORY}:${IMAGE_TAG}"
-          
+         
           # Update the deployment file directly
           sed -i "s|image: ${REGISTRY}/.*|image: ${NEW_IMAGE}|g" kubernetes/deployment.yaml
           
@@ -180,3 +176,17 @@ jobs:
           git add kubernetes/deployment.yaml
           git commit -m "Update Kubernetes deployment with new image tag: ${{ needs.docker.outputs.image_tag }} [skip ci]" || echo "No changes to commit"
           git push
+
+      
+
+
+            
+      
+      
+      
+        
+
+               
+          
+      
+      
