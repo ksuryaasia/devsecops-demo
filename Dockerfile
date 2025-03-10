@@ -1,5 +1,5 @@
 # Build stage
-FROM public.ecr.aws/eks-distro-build-tooling/nodejs:16.18.1-al2 AS build
+FROM node:current-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
