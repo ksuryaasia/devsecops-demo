@@ -2,7 +2,7 @@ name: Node js Application Deployment
 
 on: 
   push:  
-    branches: [ main ]                   # when to trigger the pipeline 
+    branches: [ main ]                   # when to trigger the pipeline realtime real branch
     paths-ignore: 
       - 'kubernetes/deployment.yaml' #Ignore changes to this file to prevent loops
 
