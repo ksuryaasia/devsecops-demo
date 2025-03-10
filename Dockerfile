@@ -1,7 +1,6 @@
 # Build stage
-FROM node:current-alpine AS build
+FROM current-alpine3.21 AS build
 WORKDIR /app
-RUN apt-get update && apt-get install -y libxml2
 COPY package*.json ./
 RUN npm ci
 COPY . .
